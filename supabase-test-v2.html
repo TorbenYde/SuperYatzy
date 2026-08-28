@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SuperYatzy – Supabase test v2</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+body{margin:0;font-family:Arial;background:#f4f6f8;color:#202830}
+header{background:#18202a;color:#fff;padding:12px 14px}h1{margin:0;font-size:20px}
+.panel{background:#fff;margin:12px;padding:14px;border-radius:9px;box-shadow:0 1px 4px #0001}
+.row{display:flex;gap:7px;flex-wrap:wrap}input,button{font:inherit;padding:9px;border-radius:7px}
+input{border:1px solid #cbd2da}button{border:0;background:#e4e8ed}button.primary{background:#2368d1;color:#fff}
+button:disabled{opacity:.45}.code{font-size:25px;font-weight:800;letter-spacing:4px}
+.status{padding:10px;border-radius:7px;background:#eef1f4}.ok{background:#e5f5e9;color:#176b35}.err{background:#fde7e7;color:#a21d1d}
+.player{display:inline-block;padding:8px 11px;background:#eef5ff;border-radius:7px;font-weight:bold;margin:3px}
+.log{font-family:monospace;font-size:12px;background:#18202a;color:#dce5ed;padding:10px;border-radius:7px;min-height:50px;white-space:pre-wrap}
+.small{font-size:12px;color:#68727c}
+</style>
+</head>
+<body>
+<header><h1>SuperYatzy – Supabase forbindelsestest v2</h1>
+<div>Testversion – Yatzy v7 ændres ikke.</div></header>
+
+<div class="panel">
+<h2>Opret eller deltag</h2>
+<div class="row">
+<input id="name" placeholder="Dit navn">
+<input id="room" placeholder="Spilkode">
+<button class="primary" id="createBtn">Opret spil</button>
+<button id="joinBtn">Deltag</button>
+</div>
+<p class="small">Efter oprettelse kan du dele linket med deltageren.</p>
+</div>
+
+<div class="panel" id="game" style="display:none">
+<h2>Spil</h2>
+<p>Spilkode: <span class="code" id="code"></span></p>
+<div class="row">
+<button class="primary" id="shareBtn">Del spil</button>
+<button id="copyBtn">Kopiér link</button>
+<button id="testBtn" disabled>Send testbesked</button>
+</div>
+<p id="status" class="status">Klar.</p>
+</div>
+
+<div class="panel" id="people" style="display:none">
+<h2>Online deltagere</h2><div id="list">Ingen deltagere endnu.</div>
+</div>
+
+<div class="panel" id="messages" style="display:none">
+<h2>Modtagne beskeder</h2><div id="log" class="log">Ingen endnu.</div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+const SUPABASE_PROJECT_URL="https://ybprfzbyqkqsujnnabzp.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY="sb_publishable_Rs2pjqj_g9Xu4T7ZZAG0aQ_d1IqIyjw";
+
+let sb=null,channel=null,room="",name="";
+const myId=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():Math.random().toString(36).slice(2)+Date.now();
+
+const $=id=>document.getElementById(id);
+
+function setStatus(text,kind){
+ const e=$("status"); e.textContent=text; e.className="status "+(kind||"");
+}
+function log(text){
+ const d=document.createElement("div");
+ d.textContent=new Date().toLocaleTimeString("da-DK")+" – "+text;
+ $("log").appendChild(d);
+}
+function makeCode(){return Math.random().toString(36).slice(2,7).toUpperCase();}
+function link(){return location.href.split("#")[0]+"#room="+encodeURIComponent(room);}
+function esc(s){return String(s).replace(/[&<>"']/g,function(c){
+ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+});}
+
+function ensureClient(){
+ if(sb)return true;
+ if(!window.supabase||typeof window.supabase.createClient!=="function"){
+   setStatus("Supabase-biblioteket blev ikke indlæst. Genindlæs siden.","err");
+   log("Fejl: supabase-js kunne ikke indlæses.");
+   return false;
+ }
+ try{
+   sb=window.supabase.createClient(SUPABASE_PROJECT_URL,SUPABASE_PUBLISHABLE_KEY,
+     {auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
+   return true;
+ }catch(e){
+   setStatus("Kunne ikke oprette Supabase-klienten.","err");
+   log("Fejl: "+(e.message||e));
+   return false;
+ }
+}
+
+function showGame(){
+ $("game").style.display="block";$("people").style.display="block";$("messages").style.display="block";
+ $("code").textContent=room;
+}
+
+async function connect(){
+ if(!ensureClient())return;
+ if(channel){try{await sb.removeChannel(channel);}catch(e){} channel=null;}
+ showGame();setStatus("Forbinder til Supabase…");
+ channel=sb.channel("superyatzy-test-"+room,{config:{presence:{key:myId},broadcast:{ack:true}}});
+ channel.on("presence",{event:"sync"},showPeople)
+ .on("broadcast",{event:"test-message"},function(payload){
+   const p=payload.payload||{};
+   log((p.name||"En spiller")+" sendte: "+(p.text||"Hej!"));
+ });
+ channel.subscribe(async function(status){
+   if(status==="SUBSCRIBED"){
+     setStatus("Forbundet til Supabase – online","ok");
+     $("testBtn").disabled=false;
+     try{await channel.track({name:name,joined_at:new Date().toISOString()});showPeople();log("Forbindelsen er oprettet.");}
+     catch(e){log("Presence-fejl: "+(e.message||e));}
+   }else if(status==="CHANNEL_ERROR"){
+     setStatus("Realtime gav en kanalfejl.","err");
+     log("CHANNEL_ERROR – forbindelsen blev afvist eller kunne ikke oprettes.");
+   }else if(status==="TIMED_OUT"){
+     setStatus("Timeout ved forbindelse til Supabase.","err");
+   }else if(status==="CLOSED"){
+     setStatus("Forbindelsen blev lukket.");$("testBtn").disabled=true;
+   }
+ });
+}
+
+function createRoom(){
+ name=($("name").value||"").trim()||"Spiller 1";
+ room=makeCode();location.hash="room="+encodeURIComponent(room);
+ showGame();$("code").textContent=room;log("Spil oprettet med kode "+room+".");connect();
+}
+function joinRoom(){
+ name=($("name").value||"").trim()||"Spiller";
+ room=($("room").value||"").trim().toUpperCase();
+ if(!room){alert("Indtast en spilkode.");return;}
+ location.hash="room="+encodeURIComponent(room);connect();
+}
+function showPeople(){
+ if(!channel)return;
+ const state=channel.presenceState(),names=[];
+ Object.values(state).forEach(function(arr){(arr||[]).forEach(function(p){names.push(p.name||"Spiller");});});
+ names.sort();
+ $("list").innerHTML=names.length?names.map(function(n){return '<span class="player">'+esc(n)+"</span>";}).join(""):"Ingen deltagere endnu.";
+}
+async function sendTest(){
+ if(!channel)return;
+ await channel.send({type:"broadcast",event:"test-message",
+ payload:{name:name,text:"Hej fra "+name+" kl. "+new Date().toLocaleTimeString("da-DK")}});
+}
+async function copyText(text){
+ if(navigator.clipboard){await navigator.clipboard.writeText(text);return;}
+ const t=document.createElement("textarea");t.value=text;document.body.appendChild(t);t.select();document.execCommand("copy");t.remove();
+}
+async function shareGame(){
+ const u=link(),t="Deltag i mit SuperYatzy-spil. Spilkode: "+room;
+ if(navigator.share){try{await navigator.share({title:"SuperYatzy",text:t,url:u});return;}catch(e){}}
+ await copyText(t+"\n"+u);alert("Spiloplysningerne er kopieret.");
+}
+async function copyLink(){await copyText(link());alert("Deltagerlinket er kopieret.");}
+
+$("createBtn").addEventListener("click",createRoom);
+$("joinBtn").addEventListener("click",joinRoom);
+$("testBtn").addEventListener("click",sendTest);
+$("shareBtn").addEventListener("click",shareGame);
+$("copyBtn").addEventListener("click",copyLink);
+
+const match=location.hash.match(/room=([^&]+)/);
+if(match)$("room").value=decodeURIComponent(match[1]);
+
+window.addEventListener("error",function(e){
+ if($("status")){setStatus("Der opstod en JavaScript-fejl.","err");log("JavaScript-fejl: "+e.message);}
+});
+})();
+</script>
+</body></html>
