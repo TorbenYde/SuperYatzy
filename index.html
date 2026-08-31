@@ -1,0 +1,685 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SuperYatzy – Online v1</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f4f6f8;color:#202830}
+header{background:#18202a;color:#fff;padding:9px 13px}
+h1{font-size:18px;margin:0}.sub{font-size:11px;opacity:.75;margin-top:2px}
+.controls{background:#fff;padding:7px 10px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;border-bottom:1px solid #d8dde3}
+.players{display:flex;gap:5px;flex-wrap:wrap;flex:1}
+.player input{width:112px;padding:6px;border:1px solid #cbd2da;border-radius:6px}
+button{font:inherit;border:0;border-radius:7px;padding:7px 10px;background:#e4e8ed;cursor:pointer}
+button.primary{background:#2368d1;color:#fff}
+button:disabled{opacity:.4;cursor:default}
+.status{background:#fff;padding:10px 12px;border-bottom:1px solid #d8dde3;min-height:58px;display:flex;align-items:center;justify-content:center;text-align:center;font-size:13px}
+.status.winner{font-size:20px;font-weight:800}
+.main{padding:9px 10px;display:grid;grid-template-columns:max-content minmax(420px,1fr);gap:12px;align-items:start}
+.table-wrap{grid-column:1;grid-row:1;overflow:auto;background:#fff;border-radius:8px;box-shadow:0 1px 4px #0001}
+table{border-collapse:collapse;width:max-content;min-width:0;font-size:12px}
+th,td{border-bottom:1px solid #e1e5e9;padding:4px 5px;text-align:center;height:28px;white-space:nowrap}
+th{background:#e9edf2;position:sticky;top:0;z-index:4}
+th:first-child,td:first-child{text-align:left;position:sticky;left:0;background:#fff;z-index:3;min-width:138px}
+th:first-child{background:#e9edf2;z-index:5}
+.max{font-size:10px;color:#68717c}
+.section td{background:#dfe5eb!important;font-weight:bold;height:26px}
+.score{min-width:46px;height:24px;line-height:24px;border-radius:5px}
+.empty{color:#9aa3ad;cursor:pointer}.used{background:#e2f0e2;font-weight:bold}.cross{background:#f3dddd;color:#b42318;font-weight:bold}
+.active-head{background:#dceaff!important;color:#0b4fa8}
+.player-col-0{background:#eef5ff}.player-col-1{background:#f4efff}.player-col-2{background:#eef8ef}.player-col-3{background:#fff5e8}
+.upper-low{color:#b42318!important;background:#fde7e7!important;font-weight:800}
+.total td{font-weight:bold;background:#eef1f4!important}.grand{font-size:15px!important}
+.dice-area{grid-column:2;grid-row:1;background:#fff;border-radius:10px;padding:11px 13px;box-shadow:0 1px 4px #0001;min-width:420px}
+.dice-area.player-bg-0{background:#eef5ff}.dice-area.player-bg-1{background:#f4efff}.dice-area.player-bg-2{background:#eef8ef}.dice-area.player-bg-3{background:#fff5e8}
+.dice-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.active-player-name{font-size:19px;font-weight:800;margin-right:9px}.dice-title{font-size:15px;font-weight:bold}.hint{font-size:11px;color:#68727c;margin-top:2px}
+.dice-grid{display:flex;flex-direction:column;gap:4px;margin:9px 0}
+.dice-row{display:flex;align-items:center;gap:6px;min-height:50px}
+.dice-label{width:18px;font-weight:bold;font-size:12px;color:#59636e;text-align:right}
+.die{width:50px;height:50px;border:2px solid #cbd2da;border-radius:9px;background:#fff;position:relative;cursor:pointer;box-shadow:0 2px 4px #0002}
+.die.held{background:#dceaff;border-color:#2368d1;transform:translateY(-2px);box-shadow:0 4px 7px #0003}
+.pip{position:absolute;width:8px;height:8px;background:#202830;border-radius:50%}
+.a{left:24%;top:24%}.b{right:24%;top:24%}.c{left:50%;top:50%;transform:translate(-50%,-50%)}.d{left:24%;bottom:24%}.e{right:24%;bottom:24%}.f{left:24%;top:50%;transform:translateY(-50%)}.g{right:24%;top:50%;transform:translateY(-50%)}
+.poss{border-top:1px solid #d9dfe5;padding-top:8px}.poss h3{font-size:15px;margin:0 0 7px}.poss-list{display:flex;gap:7px;flex-wrap:wrap}
+.option{font-size:14px;padding:8px 10px;background:#fff;border:1px solid #cbd5df}.option strong{font-size:15px}.option.best{border-color:#2368d1;background:#eaf2ff}
+.modal{position:fixed;inset:0;background:#0007;display:none;align-items:center;justify-content:center;padding:16px;z-index:20}.modal.open{display:flex}
+.card{background:#fff;border-radius:11px;padding:18px;max-width:390px;width:100%}.card h2{margin:0 0 5px}.card p{font-size:13px;color:#59636e}.row{display:flex;gap:7px}.row input{flex:1;border:1px solid #cbd2da;border-radius:7px;padding:8px}
+@media(max-width:900px){.main{display:block}.dice-area{margin-bottom:9px;min-width:0}.table-wrap{margin-top:9px}}
+
+.onlinebar{background:#fff;padding:8px 10px;border-bottom:1px solid #d8dde3;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.onlinebar input{padding:7px;border:1px solid #cbd2da;border-radius:6px;width:120px;font:inherit}
+.online-info{font-size:12px;color:#58636e;margin-left:auto}
+.online-panel{background:#fff;margin:8px 10px;padding:9px 11px;border-radius:8px;box-shadow:0 1px 4px #0001}
+.online-panel b{font-size:14px}.online-code{font-size:19px;font-weight:800;letter-spacing:3px}
+.online-players{display:flex;gap:6px;flex-wrap:wrap;margin-top:5px}
+.online-player{padding:5px 8px;border-radius:6px;background:#eef5ff;font-size:12px}
+.online-player.active{font-weight:800;background:#dceaff}
+.online-wait{font-size:12px;color:#68727c}
+
+.online-turnhint{margin:8px 10px;padding:10px 12px;border-radius:8px;background:#fff;
+box-shadow:0 1px 4px #0001;font-weight:700;font-size:14px}
+.online-turnhint.wait{font-weight:400;color:#68727c}
+
+/* v9 UI: clearer player/turn colours */
+:root{
+  --p1-bg:#e8f1ff;
+  --p2-bg:#fff0e8;
+  --p3-bg:#eaf7ea;
+  --p4-bg:#f5eaff;
+}
+.online-player{background:#dbe9ff;border:1px solid #b7cfee}
+.online-player.active{background:#bcd6ff;border:1px solid #86ace6}
+button:disabled,.roll:disabled{background:#d2d5d9!important;color:#777!important;opacity:1!important;cursor:not-allowed}
+
+/* v10 UI colours: stronger separation on Chromebook/tablet */
+:root{
+  --p1-bg:#d7e7ff;
+  --p2-bg:#fff1b8;
+  --p3-bg:#d9f0d9;
+  --p4-bg:#ead9ff;
+}
+
+
+/* v11 supports common scorecard structures used by v7 without changing layout. */
+.score-table th:nth-child(2),.score-table td:nth-child(2){background:var(--p1-bg)}
+.score-table th:nth-child(3),.score-table td:nth-child(3){background:var(--p2-bg)}
+.score-table th:nth-child(4),.score-table td:nth-child(4){background:var(--p3-bg)}
+.score-table th:nth-child(5),.score-table td:nth-child(5){background:var(--p4-bg)}
+.player-col-0{background:var(--p1-bg)!important}
+.player-col-1{background:var(--p2-bg)!important}
+.player-col-2{background:var(--p3-bg)!important}
+.player-col-3{background:var(--p4-bg)!important}
+.player-active-0{background:var(--p1-active)!important}
+.player-active-1{background:var(--p2-active)!important}
+.player-active-2{background:var(--p3-active)!important}
+.player-active-3{background:var(--p4-active)!important}
+
+/* v12: subtle clarity boost; does not assign new colours to scorecard cells */
+.player1,.player-1,.p1{filter:saturate(1.10) contrast(1.03)}
+.player2,.player-2,.p2{filter:saturate(1.10) contrast(1.03)}
+.player3,.player-3,.p3{filter:saturate(1.10) contrast(1.03)}
+.player4,.player-4,.p4{filter:saturate(1.10) contrast(1.03)}
+
+/* v13: one colour system for score columns and active dice area */
+:root{
+  --super-p1:#cfe2ff;
+  --super-p2:#fff0a8;
+  --super-p3:#d5efd5;
+  --super-p4:#e5d5ff;
+}
+.player-col-0{background:var(--super-p1)!important}
+.player-col-1{background:var(--super-p2)!important}
+.player-col-2{background:var(--super-p3)!important}
+.player-col-3{background:var(--super-p4)!important}
+
+/* The play/dice panel uses exactly the same colour as the corresponding
+   player's score column. */
+.dice-area.player-bg-0{background:var(--super-p1)!important}
+.dice-area.player-bg-1{background:var(--super-p2)!important}
+.dice-area.player-bg-2{background:var(--super-p3)!important}
+.dice-area.player-bg-3{background:var(--super-p4)!important}
+
+/* Online player labels follow the same first-two-player colours. */
+.online-player.player0{background:var(--super-p1)}
+.online-player.player1{background:var(--super-p2)}
+.online-player.player2{background:var(--super-p3)}
+.online-player.player3{background:var(--super-p4)}
+.card .row button{min-width:140px}</style>
+<style>
+.choice-popup{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:9999;display:none;min-width:280px;max-width:90vw;padding:18px 22px;border-radius:14px;background:#fff;box-shadow:0 8px 30px #0004;border:2px solid #b7cfee;text-align:center;font-size:18px;font-weight:700}
+.choice-popup.show{display:block}
+.choice-popup .choice-category{font-size:20px;margin-top:5px}
+</style><style>
+html,body{overscroll-behavior-y:contain}
+body.game-active{overscroll-behavior-y:none;touch-action:pan-x pan-y}
+</style><style>
+/* v20: invited-player startup mode */
+body.invited-mode #onlineCreate{opacity:.45;filter:grayscale(.7);cursor:not-allowed}
+body.invited-mode #onlineJoin{box-shadow:0 0 0 3px rgba(40,110,220,.22)}
+body.invited-mode #onlineCode{background:#f3f6fb;font-weight:700}
+</style><link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#17212b">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="SuperYatzy">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
+</head>
+<body>
+<header><h1>YATZY 12 – SCOREKORT</h1><div class="sub">12 terninger · 47 kategorier · v33</div></header>
+
+<div class="onlinebar">
+  <input id="onlineName" placeholder="Dit navn">
+  <input id="onlineCode" placeholder="Spilkode" maxlength="8">
+  <button class="primary" id="onlineCreate">Opret online</button>
+  <button id="onlineJoin">Deltag</button>
+  <button id="onlineShare" style="display:none">Del spil</button>
+  <span class="online-info" id="onlineStatus">Ikke online</span>
+</div>
+<div class="online-panel" id="onlinePanel" style="display:none">
+  <span>Spilkode: <span class="online-code" id="onlineRoom"></span></span>
+  <span class="online-wait" id="onlineRole"></span>
+  <div class="online-players" id="onlinePlayers"></div>
+</div>
+<div class="online-turnhint" id="onlineTurnHint" style="display:none"></div>
+<div class="controls"><div class="players" id="players"></div><button class="primary" onclick="newGame()">Nyt spil</button><button id="deletePlayerBtn" onclick="deletePlayer()" disabled>Slet spiller</button></div>
+<div class="status" id="status"></div>
+
+<div class="main">
+<section class="dice-area player-bg-0">
+ <div class="dice-head">
+  <div><span class="active-player-name" id="activePlayerName"></span><span class="dice-title" id="diceTitle">Kast 1 af 3</span><div class="hint">Tryk på terninger for at fastholde dem.</div></div>
+  <button class="primary" id="roll" onclick="roll()">KAST</button>
+ </div>
+ <div class="dice-grid" id="dice"></div>
+ <div class="poss"><h3>Mulige kombinationer</h3><div class="poss-list" id="possList">Kast for at se muligheder.</div></div>
+</section>
+<div class="table-wrap"><table id="table"></table></div>
+</div>
+
+<div id="choicePopup" class="choice-popup" aria-live="polite"></div>
+<div class="modal" id="newGameModal"><div class="card">
+<h2>Nyt spil med:</h2>
+<div class="row" style="gap:10px;flex-wrap:wrap">
+<button class="primary" onclick="newGameSame()">Samme spillere</button>
+<button onclick="newGameNew()">Nye spillere</button>
+<button onclick="closeNewGame()">Annuller</button>
+</div>
+</div></div>
+<div class="modal" id="modal"><div class="card">
+<h2 id="modalTitle"></h2><p>Vil du strege kategorien ud?</p>
+<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+<button class="primary" onclick="crossManual()">✕ Sæt 0</button>
+<button onclick="closeModal()">Annuller</button>
+</div></div></div>
+
+<script>
+const cats=[
+["Enere","8"],["Toere","16"],["Treere","24"],["Firere","32"],["Femmere","40"],["Seksere","48"],
+["1 par","12"],["2 par","22"],["3 par","30"],["4 par","36"],["5 par","40"],["6 par","42"],
+["3 ens","18"],["4 ens","24"],["5 ens","30"],["6 ens","36"],["7 ens","42"],["8 ens","48"],["9 ens","54"],["10 ens","60"],["11 ens","66"],
+["2×3 ens","33"],["2×4 ens","44"],["2×5 ens","55"],["2×6 ens","66"],["3×3 ens","45"],["3×4 ens","60"],
+["1-2-3-4-5","15"],["2-3-4-5-6","20"],["1-2-3-4-5-6","30"],["Straight + 2×6","40"],["Straight + 3×6","50"],["Straight + 4×6","60"],["Straight + 5×6","70"],["Straight + 6×6","80"],
+["2+3","28"],["2+4","34"],["2+5","40"],["2+6","46"],["3+4","39"],["3+5","45"],["3+6","51"],["4+5","50"],["4+6","56"],["5+6","61"],
+["Chance","84"],["Yatzy","322"]
+];
+const sections={0:"Øverste del",6:"Par",12:"Ens",21:"Flere grupper ens",27:"Straights",35:"Kombinationer",45:"Chance / Yatzy"};
+let players=["Spiller 1","Spiller 2"],scores=[],active=0,selected=null;
+let dice=Array(12).fill(null),held=Array(12).fill(false),rolls=0,gameStarted=false,gameFinished=false;
+
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function init(){scores=players.map(()=>Array(cats.length).fill(null));newTurn();renderAll()}
+function renderAll(){renderPlayers();renderTable();status();renderDice()}
+function status(){
+ const el=document.getElementById("status");
+ if(gameFinished){
+  const totals=players.map((_,i)=>total(i)), max=Math.max(...totals), winners=totals.map((v,i)=>v===max?i:-1).filter(i=>i>=0);
+  el.className="status winner";
+  el.textContent=winners.length===1?`${players[winners[0]]} har vundet med ${max} point`:`Uafgjort: ${winners.map(i=>players[i]).join(" og ")} med ${max} point`;
+ }else{
+  el.className="status";
+  el.innerHTML="Aktiv spiller: <b>"+esc(players[active])+"</b>";
+ }
+ document.getElementById("activePlayerName").textContent=players[active]||"";
+ document.getElementById("deletePlayerBtn").disabled=!gameFinished||players.length<=1;
+}
+function renderPlayers(){
+ const el=document.getElementById("players");el.innerHTML="";
+ players.forEach((p,i)=>{
+  const d=document.createElement("div");d.className="player";
+  const inp=document.createElement("input");inp.value=p;
+  inp.onclick=()=>{active=i;inp.select();status();renderTable();renderDice()};
+  inp.onchange=()=>{players[i]=inp.value.trim()||"Spiller "+(i+1);status();renderTable();renderDice()};
+  d.appendChild(inp);el.appendChild(d);
+ });
+ const b=document.createElement("button");b.textContent="+ Spiller";b.disabled=players.length>=4||gameStarted;
+ b.onclick=()=>{if(!gameStarted&&players.length<4){players.push("Spiller "+(players.length+1));scores.push(Array(cats.length).fill(null));renderAll()}};
+ el.appendChild(b);
+}
+function renderTable(){
+ let h="<thead><tr><th>Kategori</th><th>Max</th>";
+ players.forEach((p,i)=>h+=`<th class="player-col-${i} ${i===active?"active-head":""}">${esc(p)}</th>`);
+ h+="</tr></thead><tbody>";
+ cats.forEach((c,ci)=>{
+  if(sections[ci])h+=`<tr class="section"><td colspan="${players.length+2}">${sections[ci]}</td></tr>`;
+  h+=`<tr><td>${c[0]}</td><td class="max">${c[1]}</td>`;
+  players.forEach((p,pi)=>{
+   const v=scores[pi][ci];let cls=v===null?"empty":v==="X"?"cross":"used";
+   if(ci<6&&typeof v==="number"&&v<8*(ci+1))cls+=" upper-low";
+   h+=`<td class="player-col-${pi}"><div class="score ${cls}" ${v===null?`onclick="openManual(${pi},${ci})"`:""}>${v===null?"—":v==="X"?"✕":v}</div></td>`;
+  });h+="</tr>";
+  if(ci===5){h+=summaryRow("Sum øverste - 8 af hver = 168",players.map((_,i)=>upper(i)),"");h+=summaryRow("Bonus",players.map((_,i)=>bonus(i)),"200")}
+ });
+ h+=summaryRow("TOTAL",players.map((_,i)=>total(i)),"",true)+"</tbody>";
+ document.getElementById("table").innerHTML=h;
+}
+function summaryRow(label,vals,max,big=false){return `<tr class="total"><td class="${big?"grand":""}">${label}</td><td>${max}</td>${vals.map(v=>`<td class="${big?"grand":""}">${v}</td>`).join("")}</tr>`}
+function upper(i){return scores[i].slice(0,6).reduce((s,v)=>s+(typeof v==="number"?v:0),0)}
+function bonus(i){return upper(i)>=168?200:0}
+function total(i){return scores[i].reduce((s,v)=>s+(typeof v==="number"?v:0),0)+bonus(i)}
+function newTurn(){dice=Array(12).fill(null);held=Array(12).fill(false);rolls=0;renderDice();renderPoss()}
+function roll(){
+ if(rolls>=3||gameFinished)return;
+ gameStarted=true;renderPlayers();
+ for(let i=0;i<12;i++)if(!held[i])dice[i]=1+Math.floor(Math.random()*6);
+ rolls++;renderDice();renderPoss();status();
+}
+function toggleDie(i){if(rolls===0||gameFinished)return;held[i]=!held[i];renderDice()}
+function renderDice(){
+ const area=document.querySelector(".dice-area");area.className="dice-area player-bg-"+active;
+ const el=document.getElementById("dice");el.innerHTML="";
+ for(let face=1;face<=6;face++){
+  const row=document.createElement("div");row.className="dice-row";
+  const lab=document.createElement("div");lab.className="dice-label";lab.textContent=face;row.appendChild(lab);
+  for(const hs of [true,false])for(let i=0;i<12;i++)if(dice[i]===face&&!!held[i]===hs){
+   const d=document.createElement("div");d.className="die"+(held[i]?" held":"");
+   d.setAttribute("role","button");d.setAttribute("tabindex","0");
+   d.style.pointerEvents="auto";
+   d.addEventListener("click",(ev)=>{ev.preventDefault();ev.stopPropagation();toggleDie(i)});
+   d.addEventListener("keydown",(ev)=>{if(ev.key==="Enter"||ev.key===" "){ev.preventDefault();toggleDie(i)}});
+   drawDie(d,face);row.appendChild(d);
+  }
+  el.appendChild(row);
+ }
+ const activeName=players[active]||"Spiller";
+ if(rolls===0)document.getElementById("diceTitle").textContent=" skal kaste 1. kast af 3";
+ else if(rolls===1)document.getElementById("diceTitle").textContent=" - resultatet af 1. kast";
+ else if(rolls===2)document.getElementById("diceTitle").textContent=" - resultatet af 2. kast";
+ else document.getElementById("diceTitle").textContent=" - resultatet af 3. og sidste kast";
+ document.getElementById("roll").disabled=rolls>=3||gameFinished;
+}
+function drawDie(el,n){
+ const maps={1:["c"],2:["a","e"],3:["a","c","e"],4:["a","b","d","e"],5:["a","b","c","d","e"],6:["a","b","f","g","d","e"]};
+ maps[n].forEach(x=>{const p=document.createElement("span");p.className="pip "+x;el.appendChild(p)})
+}
+function renderPoss(){
+ const box=document.getElementById("possList");
+ if(rolls===0){box.textContent="Kast for at se muligheder.";return}
+ const counts=Array(7).fill(0);dice.forEach(v=>{if(v)counts[v]++});const entries=[];
+ let bf=0,bc=-1;
+ for(let f=1;f<=6;f++)if(scores[active][f-1]===null&&(counts[f]>bc||(counts[f]===bc&&f>bf))){bc=counts[f];bf=f}
+ if(bf>0&&bc>0)entries.push([bf-1,cats[bf-1][0],bf*bc]);
+ const pairNames=["1 par","2 par","3 par","4 par","5 par","6 par"];
+ for(let k=1;k<=6;k++){const ci=6+k-1;if(scores[active][ci]!==null)continue;const fs=[];for(let f=6;f>=1;f--)if(counts[f]>=2)fs.push(f);if(fs.length>=k)entries.push([ci,pairNames[k-1],fs.slice(0,k).reduce((s,f)=>s+2*f,0)])}
+ const r=analyze(dice);
+ for(const [key,score] of Object.entries(r)){const ci=indexFor(key);if(ci>=12&&ci>=0&&scores[active][ci]===null)entries.push([ci,key,score])}
+ if(!entries.length){box.textContent="Ingen ledig kategori opfyldt. En tilbageværende kategori kan markeres med ✕.";return}
+ box.innerHTML=entries.map(([ci,k,s])=>`<button class="option ${s>=100?"best":""}" onclick="choose(${ci},${s})">${esc(k)} <strong>${s}</strong></button>`).join("");
+}
+function indexFor(k){const n={"1":"Enere","2":"Toere","3":"Treere","4":"Firere","5":"Femmere","6":"Seksere"};if(n[k])k=n[k];k=k.replaceAll("x","×");return cats.findIndex(c=>c[0].toLowerCase()===k.toLowerCase())}
+function analyze(ds){
+ const c=Array(7).fill(0);ds.forEach(x=>{if(x)c[x]++});const r={};
+ for(let f=1;f<=6;f++)r[String(f)]=c[f]*f;
+ for(let k=1;k<=6;k++){const fs=[];for(let f=6;f>=1;f--)if(c[f]>=2)fs.push(f);if(fs.length>=k)r[k+" par"]=fs.slice(0,k).reduce((s,f)=>s+2*f,0)}
+ for(let n=3;n<=11;n++)for(let f=6;f>=1;f--)if(c[f]>=n){r[n+" ens"]=n*f;break}
+ [[2,3],[2,4],[2,5],[2,6],[3,4],[3,5],[3,6],[4,5],[4,6],[5,6]].forEach(([a,b])=>{let best=-1;for(let x=1;x<=6;x++)for(let y=1;y<=6;y++)if(x!==y&&c[x]>=a&&c[y]>=b)best=Math.max(best,a*x+b*y);if(best>=0)r[a+"+"+b]=best});
+ [[2,3],[2,4],[2,5],[2,6],[3,3],[3,4]].forEach(([g,n])=>{const fs=[];for(let f=6;f>=1;f--)if(c[f]>=n)fs.push(f);if(fs.length>=g)r[g+"x"+n+" ens"]=fs.slice(0,g).reduce((s,f)=>s+n*f,0)});
+ if([1,2,3,4,5].every(f=>c[f]))r["1-2-3-4-5"]=15;
+ if([2,3,4,5,6].every(f=>c[f]))r["2-3-4-5-6"]=20;
+ if([1,2,3,4,5,6].every(f=>c[f])){r["1-2-3-4-5-6"]=30;const extra=c[6]-1,pts={2:40,3:50,4:60,5:70,6:80};for(let n=2;n<=6;n++)if(extra>=n)r["Straight + "+n+"×6"]=pts[n]}
+ r["Chance"]=ds.reduce((s,x)=>s+x,0);if(ds.every(x=>x!==null&&x===ds[0]))r["Yatzy"]=ds.reduce((s,x)=>s+x,0)+250;return r
+}
+function choose(ci,score){if(scores[active][ci]!==null)return;scores[active][ci]=score;checkFinished();if(!gameFinished){active=(active+1)%players.length;newTurn();renderAll()}else{newTurn();renderAll()}}
+function checkFinished(){gameFinished=players.length>0&&players.every((_,i)=>scores[i].every(v=>v!==null));status()}
+function openManual(pi,ci){selected={pi,ci};document.getElementById("modalTitle").textContent=cats[ci][0];document.getElementById("modal").classList.add("open")}
+function saveManual(){closeModal()}
+function crossManual(){scores[selected.pi][selected.ci]="X";closeModal();checkFinished();if(!gameFinished){active=(active+1)%players.length;newTurn();renderAll()}else{newTurn();renderAll()}}
+function closeModal(){document.getElementById("modal").classList.remove("open");selected=null}
+function deletePlayer(){if(!gameFinished||players.length<=1)return;if(!confirm("Slet "+players[active]+" fra det afsluttede spil?"))return;players.splice(active,1);scores.splice(active,1);active=Math.min(active,players.length-1);gameFinished=true;renderAll()}
+function newGame(){
+ document.getElementById("newGameModal").classList.add("open");
+
+ if(gameFinished&&onlineRoom)clearOnlineSession();
+}
+function closeNewGame(){
+ document.getElementById("newGameModal").classList.remove("open");
+}
+function newGameSame(){
+ closeNewGame();
+ gameStarted=false;gameFinished=false;active=0;
+ scores=players.map(()=>Array(cats.length).fill(null));
+ newTurn();renderAll();
+ if(onlineRoom)onlineBroadcastState();
+}
+function newGameNew(){
+ closeNewGame();
+ players=[""];scores=[Array(cats.length).fill(null)];
+ gameStarted=false;gameFinished=false;active=0;
+ newTurn();renderAll();
+ setTimeout(()=>{const i=document.querySelector(".player input");if(i){i.focus();i.select()}},50);
+}
+
+/* ---------- ONLINE MULTIPLAYER v27 ---------- */
+const SUPABASE_URL="https://ybprfzbyqkqsujnnabzp.supabase.co";
+const SUPABASE_KEY="sb_publishable_Rs2pjqj_g9Xu4T7ZZAG0aQ_d1IqIyjw";
+const sbClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+
+let onlineId="";
+try{
+  onlineId=localStorage.getItem("superyatzy-device-id")||"";
+  if(!onlineId){
+    onlineId=(crypto&&crypto.randomUUID)?crypto.randomUUID():Math.random().toString(36).slice(2)+Date.now();
+    localStorage.setItem("superyatzy-device-id",onlineId);
+  }
+}catch(e){
+  onlineId=(crypto&&crypto.randomUUID)?crypto.randomUUID():Math.random().toString(36).slice(2)+Date.now();
+}
+let onlineChannel=null,onlineRoom="",onlineName="",onlineHost=false,onlineReady=false;
+let onlinePlayerIds=[];
+let onlinePollTimer=null,onlineLastStateStamp=0,onlineLastChoiceStamp=0;
+
+function onlineSetStatus(t,kind){
+  const e=document.getElementById("onlineStatus");
+  if(e){e.textContent=t;e.style.color=kind==="ok"?"#176b35":kind==="err"?"#a21d1d":"#58636e";}
+}
+function onlineMakeCode(){return Math.random().toString(36).slice(2,7).toUpperCase();}
+function onlineState(){
+ return {type:"state",version:33,status:gameFinished?"finished":"active",room:onlineRoom,
+ players:players.slice(),playerIds:onlinePlayerIds.slice(),scores:scores.map(a=>a.slice()),
+ active,gameStarted,gameFinished,dice:dice.slice(),held:held.slice(),rolls,
+ hostId:onlinePlayerIds[0]||onlineId,savedAt:Date.now(),
+ choiceEvent:window._onlineChoiceEvent||null};
+}
+async function dbGet(room){
+ try{
+  const {data,error}=await sbClient.from("games").select("id,game_state").eq("room_code",room).limit(1);
+  if(error)throw error; return data&&data.length?data[0]:null;
+ }catch(e){console.error("SuperYatzy DB read:",e);return null}
+}
+async function dbSaveState(state){
+ if(!onlineRoom||!state)return false;
+ try{
+  const row=await dbGet(onlineRoom);
+  const payload={game_state:state,updated_at:new Date().toISOString()};
+  if(row){
+   const {error}=await sbClient.from("games").update(payload).eq("id",row.id);
+   if(error)throw error;
+  }else{
+   const {error}=await sbClient.from("games").insert({
+    room_code:onlineRoom,game_state:state,updated_at:new Date().toISOString()
+   });
+   if(error)throw error;
+  }
+  return true;
+ }catch(e){console.error("SuperYatzy DB state write:",e);return false}
+}
+async function dbSave(){
+ return dbSaveState(onlineState());
+}
+async function onlineBroadcastState(){
+ if(onlineChannel&&onlineReady&&onlineHost)
+   await onlineChannel.send({type:"broadcast",event:"state",payload:onlineState()});
+}
+async function onlineCommit(){if(onlineHost){await dbSave();await onlineBroadcastState()}}
+function onlineApplyState(st){
+ if(!st||st.room!==onlineRoom)return;
+ onlineLastStateStamp=Math.max(onlineLastStateStamp,Number(st.savedAt)||0);
+ if(st.choiceEvent&&Number(st.choiceEvent.at||0)>onlineLastChoiceStamp){
+   onlineLastChoiceStamp=Number(st.choiceEvent.at)||0;
+   if(st.choiceEvent.player&&st.choiceEvent.category)
+     showChoicePopup(st.choiceEvent.player,st.choiceEvent.category);
+ }
+ players=Array.isArray(st.players)?st.players.slice():players;
+ onlinePlayerIds=Array.isArray(st.playerIds)?st.playerIds.slice():onlinePlayerIds;
+ scores=Array.isArray(st.scores)?st.scores.map(a=>a.slice()):scores;
+ active=Number.isInteger(st.active)?st.active:0;gameStarted=!!st.gameStarted;gameFinished=!!st.gameFinished;
+ dice=Array.isArray(st.dice)?st.dice.slice():Array(12).fill(null);
+ held=Array.isArray(st.held)?st.held.slice():Array(12).fill(false);rolls=Number.isInteger(st.rolls)?st.rolls:0;
+ renderAll();renderPoss();onlineRenderPlayers();setGameActiveClass();
+}
+function onlineRenderPlayers(){
+ const el=document.getElementById("onlinePlayers");
+ if(el)el.innerHTML=players.map((p,i)=>'<span class="online-player player'+i+' '+(i===active?"active":"")+'">'+esc(typeof p==="string"?p:"Spiller "+(i+1))+(i===0?" (vært)":"")+'</span>').join("");
+ const role=document.getElementById("onlineRole");
+ if(role)role.textContent=onlineHost?" · Du er vært – du styrer spillet":" · Du er deltager";
+ const hint=document.getElementById("onlineTurnHint");
+ if(hint){
+  hint.style.display="block";
+  if(gameFinished){hint.className="online-turnhint";hint.textContent="Spillet er slut."}
+  else if(players[active]&&onlinePlayerIds[active]===onlineId){hint.className="online-turnhint";hint.textContent="Det er din tur – kast terningerne og vælg en ledig kombination."}
+  else{hint.className="online-turnhint wait";hint.textContent="Venter på "+(players[active]||"Spiller")+"…"}
+ }
+ onlineUpdateControls();
+}
+function onlineUpdateControls(){
+ const c=document.getElementById("onlineCreate"),j=document.getElementById("onlineJoin"),sh=document.getElementById("onlineShare");
+ const invited=document.body.classList.contains("invited-mode");
+ if(!onlineRoom){
+  if(c)c.disabled=invited;
+  if(j)j.disabled=false; if(sh)sh.disabled=true;
+ }else{
+  if(c)c.disabled=true;if(j)j.disabled=true;if(sh)sh.disabled=!onlineHost||gameFinished;
+ }
+ const myTurn=onlineRoom&&onlinePlayerIds[active]===onlineId;
+ const canRoll=!!(myTurn&&onlineReady&&!gameFinished&&rolls<3);
+ document.querySelectorAll("button").forEach(b=>{
+  if((b.textContent||"").trim().toUpperCase()==="KAST")b.disabled=!canRoll;
+ });
+}
+async function onlineApplyAction(a,from){
+ if(!onlineRoom||!a)return false;
+
+ /* Always start from the latest durable state to avoid overwriting a newer
+    action from the other device. */
+ const row=await dbGet(onlineRoom);
+ if(!row||!row.game_state)return false;
+ const st=row.game_state;
+ if(st.status==="finished")return false;
+
+ const ids=Array.isArray(st.playerIds)?st.playerIds:[];
+ const current=Number.isInteger(st.active)?st.active:0;
+ const actor=from||onlineId;
+ if(ids[current]&&ids[current]!==actor)return false;
+
+ /* Load the authoritative state into this client before applying the action. */
+ onlineApplyState(st);
+
+ if(a.type==="roll"){
+   if(rolls>=3||gameFinished)return false;
+   gameStarted=true;
+   for(let i=0;i<12;i++)if(!held[i])dice[i]=1+Math.floor(Math.random()*6);
+   rolls++;
+ }else if(a.type==="toggle"){
+   if(rolls===0||gameFinished||!Number.isInteger(a.index))return false;
+   held[a.index]=!held[a.index];
+ }else if(a.type==="score"){
+   const ci=a.index;
+   if(gameFinished||!Number.isInteger(ci)||ci<0||ci>=cats.length||scores[active][ci]!==null)return false;
+   scores[active][ci]=a.value;
+   window._onlineChoiceEvent={player:players[active]||"Spiller",category:cats[ci]?cats[ci][0]:"",at:Date.now()};
+   checkFinished();
+   if(!gameFinished){
+     active=(active+1)%players.length;
+     newTurn();
+   }else{
+     newTurn();
+   }
+ }else return false;
+
+ renderAll();renderPoss();onlineRenderPlayers();setGameActiveClass();
+ return await dbSaveState(onlineState());
+}
+async function onlineAddPlayer(id,name){
+ if(!onlineRoom||!id)return false;
+ const row=await dbGet(onlineRoom);
+ if(!row||!row.game_state)return false;
+ onlineApplyState(row.game_state);
+ let idx=onlinePlayerIds.indexOf(id);
+ if(idx>=0){
+   if(name)players[idx]=name;
+ }else{
+   if(players.length>=4)return false;
+   players.push(name||("Spiller "+(players.length+1)));
+   onlinePlayerIds.push(id);
+   scores.push(Array(cats.length).fill(null));
+ }
+ renderAll();renderPoss();onlineRenderPlayers();
+ return await dbSaveState(onlineState());
+}
+function stopOnlinePolling(){
+ if(onlinePollTimer){clearInterval(onlinePollTimer);onlinePollTimer=null;}
+}
+async function pollOnlineState(){
+ if(!onlineRoom)return;
+ const row=await dbGet(onlineRoom);
+ if(!row||!row.game_state||row.game_state.status==="finished")return;
+ const stamp=Number(row.game_state.savedAt)||0;
+ if(stamp>onlineLastStateStamp){
+   onlineApplyState(row.game_state);
+ }
+}
+function startOnlinePolling(){
+ stopOnlinePolling();
+ onlinePollTimer=setInterval(pollOnlineState,500);
+ pollOnlineState();
+}
+async function onlineConnect(){
+ if(onlineChannel)try{await sbClient.removeChannel(onlineChannel)}catch(e){}
+ /* Database polling is the reliable transport in v33. Realtime is only an
+    optional fast path and is no longer required for the game to work. */
+ onlineReady=false;
+ const test=await dbGet(onlineRoom);
+ if(!test||!test.game_state){
+   onlineSetStatus("Kan ikke hente spil","err");
+   return;
+ }
+ onlineReady=true;
+ onlineSetStatus("Online – forbundet","ok");
+ startOnlinePolling();
+
+ try{
+   onlineChannel=sbClient.channel("superyatzy-db-"+onlineRoom,{
+     config:{presence:{key:onlineId},broadcast:{ack:true}}
+   })
+   .on("postgres_changes",
+     {event:"UPDATE",schema:"public",table:"games",filter:"room_code=eq."+onlineRoom},
+     payload=>{
+       if(payload.new&&payload.new.game_state)onlineApplyState(payload.new.game_state);
+     })
+   .on("postgres_changes",
+     {event:"INSERT",schema:"public",table:"games",filter:"room_code=eq."+onlineRoom},
+     payload=>{
+       if(payload.new&&payload.new.game_state)onlineApplyState(payload.new.game_state);
+     });
+   onlineChannel.subscribe(async st=>{
+     if(st==="SUBSCRIBED"){
+       try{await onlineChannel.track({name:onlineName})}catch(e){}
+     }
+   });
+ }catch(e){
+   console.warn("Realtime optional path unavailable:",e);
+ }
+ onlineRenderPlayers();
+}
+async function onlineCreate(){
+ clearOnlineSession();
+ onlineName=(document.getElementById("onlineName").value||"").trim()||"Spiller 1";
+ onlineRoom=onlineMakeCode();onlineHost=true;players=[onlineName];onlinePlayerIds=[onlineId];scores=[Array(cats.length).fill(null)];
+ active=0;gameStarted=false;gameFinished=false;window._onlineChoiceEvent=null;newTurn();
+ document.getElementById("onlineRoom").textContent=onlineRoom;document.getElementById("onlinePanel").style.display="block";
+ document.getElementById("onlineShare").style.display="inline-block";saveOnlineSession();
+ renderAll();renderPoss();onlineRenderPlayers();onlineUpdateControls();await dbSave();await onlineConnect();
+}
+async function onlineJoin(){
+ clearOnlineSession();
+ const name=(document.getElementById("onlineName").value||"").trim();
+ const code=(document.getElementById("onlineCode").value||"").trim().toUpperCase();
+ if(!code){alert("Spilkoden mangler.");return}
+
+ onlineName=name||"Spiller";
+ onlineRoom=code;onlineHost=false;onlineReady=false;
+
+ const row=await dbGet(onlineRoom);
+ if(!row||!row.game_state||row.game_state.status==="finished"){
+   alert("Spillet blev ikke fundet eller er allerede afsluttet.");
+   onlineRoom="";onlineUpdateControls();return;
+ }
+ onlineApplyState(row.game_state);
+
+ let idx=onlinePlayerIds.indexOf(onlineId);
+ if(idx>=0){
+   players[idx]=onlineName;
+ }else{
+   if(players.length>=4){alert("Spillet er fuldt.");onlineRoom="";return;}
+   players.push(onlineName);
+   onlinePlayerIds.push(onlineId);
+   scores.push(Array(cats.length).fill(null));
+ }
+ renderAll();renderPoss();onlineRenderPlayers();onlineUpdateControls();
+
+ const saved=await dbSaveState(onlineState());
+ if(!saved){
+   alert("Kunne ikke gemme deltagelsen i spillet. Prøv igen.");
+   onlineRoom="";onlineReady=false;onlineUpdateControls();return;
+ }
+ saveOnlineSession();
+ document.getElementById("onlineRoom").textContent=onlineRoom;
+ document.getElementById("onlinePanel").style.display="block";
+ document.getElementById("onlineShare").style.display="none";
+ await onlineConnect();
+}
+async function onlineShare(){
+ const url=location.href.split("#")[0]+"?room="+encodeURIComponent(onlineRoom);
+ const text="Deltag i mit SuperYatzy-spil. Spilkode: "+onlineRoom;
+ if(navigator.share){try{await navigator.share({title:"SuperYatzy",text,url});return}catch(e){}}
+ if(navigator.clipboard){await navigator.clipboard.writeText(text+"\n"+url);alert("Spiloplysningerne er kopieret.")}
+ else alert("Spilkode: "+onlineRoom);
+}
+
+const SUPER_YATZY_SESSION_KEY="superyatzy-online-session-v33";
+function saveOnlineSession(){if(!onlineRoom||!onlineName)return;try{localStorage.setItem(SUPER_YATZY_SESSION_KEY,JSON.stringify({room:onlineRoom,name:onlineName,id:onlineId,savedAt:Date.now()}))}catch(e){}}
+function clearOnlineSession(){try{localStorage.removeItem(SUPER_YATZY_SESSION_KEY)}catch(e){}}
+function loadOnlineSession(){try{const x=JSON.parse(localStorage.getItem(SUPER_YATZY_SESSION_KEY)||"null");if(!x||!x.room||!x.name)return null;if(Date.now()-(x.savedAt||0)>86400000){clearOnlineSession();return null}return x}catch(e){return null}}
+async function recoverOnlineSession(){
+ const x=loadOnlineSession();if(!x)return;
+ const row=await dbGet(x.room);
+ if(!row||!row.game_state||row.game_state.status==="finished"){clearOnlineSession();return}
+ onlineRoom=x.room;onlineName=x.name;onlineHost=(row.game_state.hostId===onlineId);
+ onlineApplyState(row.game_state);setGameActiveClass();await onlineConnect();
+}
+
+/* Online overrides */
+const localRoll=roll,localToggleDie=toggleDie,localChoose=choose,localCrossManual=crossManual;
+roll=function(){if(onlineRoom){onlineSendAction({type:"roll"});return}localRoll()};
+toggleDie=function(i){if(onlineRoom){onlineSendAction({type:"toggle",index:i});return}localToggleDie(i)};
+choose=function(ci,score){
+ if(onlineRoom){if(!onlineReady||rolls===0||rolls>3||gameFinished)return;if(!Number.isInteger(ci)||ci<0||ci>=cats.length||scores[active][ci]!==null)return;onlineSendAction({type:"score",index:ci,value:score});return}
+ localChoose(ci,score);
+};
+crossManual=function(){if(onlineRoom){const ci=selected.ci;closeModal();onlineSendAction({type:"score",index:ci,value:"X"});return}localCrossManual()};
+
+async function onlineSendAction(action){
+ if(!onlineRoom||!onlineReady)return;
+ await onlineApplyAction(action,onlineId);
+}
+document.getElementById("onlineCreate").onclick=onlineCreate;
+document.getElementById("onlineJoin").onclick=onlineJoin;
+document.getElementById("onlineShare").onclick=onlineShare;
+
+/* Keep invitation mode completely independent of any other browser tab. */
+function initInvitedMode(){
+ try{
+  const u=new URL(window.location.href),room=(u.searchParams.get("room")||u.searchParams.get("code")||u.searchParams.get("game")||"").trim().toUpperCase();
+  if(!room)return;
+  const code=document.getElementById("onlineCode"),name=document.getElementById("onlineName"),create=document.getElementById("onlineCreate"),join=document.getElementById("onlineJoin");
+  if(!code||!name||!create||!join)return;
+  code.value=room;code.readOnly=true;create.disabled=true;join.disabled=false;join.classList.add("primary");
+  document.body.classList.add("invited-mode");
+ }catch(e){}
+}
+initInvitedMode();
+init();
+setGameActiveClass();
+/* Deliberately no automatic recovery on ordinary startup.
+   Recovery will only be added later as an explicit "Fortsæt spil" action. */
+</script>
+<script>
+if("serviceWorker" in navigator){
+  window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));
+}
+</script>
+</body>
+</html>
